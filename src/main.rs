@@ -667,7 +667,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
             }
             b'@' => {
                 let a = stack.pop().oos(&strict);
-                if a == -1 {break} // This would lead to perpetual spinlock basically haling ,execution, so better make it an exit strategy
+                if a == -1 {break} // This jumps back to the same opcode JMP again, so never needed, reserved for exit
                 index = (Wrapping(index)+Wrapping(a as usize)).0;
             }
             b'?' => {

@@ -1,5 +1,8 @@
+; Assemble using: nasm -f bin tempalte.nasm -o template
+; This makes it easyter to create new template file than just a plain hex file you need to edit
+; 32 bytes per instruction will be hardcoded, so if you pas that, you need to adjust at compiler (But you should not make it more big !)
+
 ; See https://upload.wikimedia.org/wikipedia/commons/e/e4/ELF_Executable_and_Linkable_Format_diagram_by_Ange_Albertini.png
-; Assemble using: nasm -f bin
 [bits 64]
 
 ; Virtual address of where the ELF file will be mapped
@@ -34,7 +37,7 @@ dw program_headers; size of program entry header
 
 
 program_headers:
-dd 1 ; = loadable srgment
+dd 1 ; = loadable segment
 dd 5; Flags: 0x01 = executable, 0x02 = writable, 0x04 = readable
 dq 0 ; loadable segment offset (load everything from start)
 dq OFFSET ; Virutal address where to palce this elf in memory
@@ -50,17 +53,16 @@ STACKSIZE equ 0x10000000; 256MB
 entry_point:
 
 ; Setup 36 bytes
-mov rax, 12
-xor rdi, rdi
-syscall
+mov rax, 12 	; brk
+xor rdi, rdi 	; 0 = get current
+syscall 		; rax = current
 
 mov rbp, STACKSIZE
 add rbp, rax
 
 mov rdi, STACKSIZE*2
-add rdi, rax
-mov rax, 12
-
+add rdi, rax	; rax offset + rdi
+mov rax, 12 	; brk
 syscall
 
 mov rsp, rax ; now RSP points to active stack and RBP to the inactive one
@@ -145,6 +147,12 @@ mov rax, [rsp]
 push rax
 db "_____"
 
+; = JMP
+db "__@__"
+;We could do an and to drop the bits and basically get a floor adress here then do rel jmp
+lea rax, [rip + 0]
+db "_____"
+
 ; ? READ
 db "__?__"
 lea rsp, [rsp-8]
@@ -181,10 +189,11 @@ push rax
 db "_____"
 
 
-;Exit 10 bytes
-mov rax, 60
-xor rdi, rdi
-syscall
+; This should be done within thje jump opcode
+; ;Exit 10 bytes
+; mov rax, 60
+; xor rdi, rdi
+; syscall
 
 code_section_end:
 ; code_section_end equ "%ASMEND%"
