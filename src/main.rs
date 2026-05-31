@@ -3,8 +3,7 @@ use std::env;
 use std::assert;
 use std::process::exit;
 use std::num::Wrapping;
-use std::arch::asm;
-use std::io::{Read, Write, stdin, stdout, stderr};
+use std::io::{Read, Write, stdin, stdout/*, stderr*/};
 use std::collections::HashMap;
 
 
@@ -30,7 +29,8 @@ const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'1', // SHL 1; | 1
 ];
 
-fn main() {
+fn main() -> Result<(),std::io::Error> {
+// fn main<E:From<std::io::Error> + std::fmt::Debug>() -> Result<(),E> {
 
     let mut args = env::args();
     args.next();
@@ -54,7 +54,7 @@ fn main() {
         let param = p.as_str();
 
         if param.starts_with("--"){
-            match(param){
+            match param{
                 "--help" => {
                     eprintln!("Usage stackofstacks [--debug, --compile, --bytecode] FILENAME");
                     eprintln!("  --debug     Shows debug / trace on STDERR while runniogn program");
@@ -119,9 +119,9 @@ fn main() {
     
     let mut script_bytes:Vec<u8> = Vec::with_capacity(size.try_into().unwrap());
     script_bytes.resize(size, 0);
-    file.read(&mut script_bytes);
+    file.read(&mut script_bytes)?;
 
-    match(mode){
+    match mode{
         Mode::RUN => { 
             // println!("{:?}", &tokenise(script_bytes));
             // println!("{}", std::str::from_utf8(&parse(&tokenise(script_bytes))).unwrap());
@@ -129,7 +129,7 @@ fn main() {
         },
         Mode::COMPILE => { 
             let mut out = stdout().lock();
-            out.write( &compile(&parse(&tokenise(script_bytes))) ); 
+            out.write( &compile(&parse(&tokenise(script_bytes))) )?; 
         },
         Mode::BYTECODE => { 
             run(&bytecode(&parse(&tokenise(script_bytes))), debug, strict); 
@@ -149,12 +149,14 @@ fn main() {
         },        
     }
 
+    Ok(())
+
 }
 
-fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>{
+fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, _index:&usize)->Vec<u8>{
 
     //input is already screened to not contain non-ascii characters by the tokenise funtion
-    let string = std::str::from_utf8(input).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
+    // let string = std::str::from_utf8(input).expect("INTERPRETER's FAULT: The function 'tokenise' should have checked for non ascii characters!");
 
     #[derive(Debug)]
     enum Token{
@@ -207,13 +209,13 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
     for token in &tokens{
 
         match token{
-            Token::Number(v) => {
+            Token::Number(_) => {
                 if !should_be_number{
                     eprintln!("Macro parsing error: Unexpected (extra) Number in macro: [{}]", std::str::from_utf8(input).unwrap());
                     exit(1);        
                 }
             },
-            Token::Operator(b) => {
+            Token::Operator(_) => {
                 if should_be_number{
                     eprintln!("Macro parsing error: Unexpected (extra) Operator in macro: [{}]", std::str::from_utf8(input).unwrap());
                     exit(1);        
@@ -325,10 +327,49 @@ fn expand(input:&Vec<u8>, labels:&HashMap<Vec<u8>,usize>, index:&usize)->Vec<u8>
     }
 
 
+    // Here we make a numbe rinot a list of opcodes
+    // we CANNOT and WILL not make this variable length..
+    // since then everything shifts, compile rno longer streaming, manual offsets break...
     let ret = format!("!{:064b}", acc);
     assert!(ret.len() == 65); //Must be 65 characters wide
 
+//     let mut ret:Vec<u8> = vec!();
+//     const HIGH_BIT: i64 = i64::MIN; //This is only highest bit = true
+//     let num:bool = (acc & HIGH_BIT) != 0;
 
+//     let mut leading:usize = 1;
+//     for i in 0..63{
+//         acc <<= 1;
+//         if ((acc & HIGH_BIT)!=0) != num {break}
+//         leading += 1;
+//     }
+
+//         match num{
+//             false => {  //positive number leading 0
+//                 ret.push(b'!');
+//                 ret.push(b'!');
+//                 ret.push(b'^');
+//             },
+//             true => { //negtaive number leading 1
+//                 ret.push(b'!');
+//             },
+//         };
+
+//     //TODO:! implement bit conversion for 2-complement negative
+
+//     for i in 0..64-leading{
+
+//         let chr = match (acc & HIGH_BIT)!=0{
+//             true => b'1',
+//             false => b'0',
+//         };
+//         ret.push(chr);
+
+//         acc <<= 1;
+//     }
+
+
+// for token in ret.iter(){
     for token in ret.bytes(){
         if !TOKENS.contains(&token){
             panic!("INTERPRETER's FAULT: Invalid tokens in macro output!");
@@ -482,7 +523,7 @@ fn parse(tokens:&Vec<Token>) -> Vec<u8>{
             Token::Script(v) => {
                 index += v.len();
             },
-            Token::Macro(v) => {
+            Token::Macro(_) => {
                 //And heres the crux, we need to know NOW how long expanded macro size will be, and macro needs the label offset chicken and egg story
                 //For now macro's have output size fixed at 65 !+binary number
                 index += 65;
@@ -504,7 +545,7 @@ fn parse(tokens:&Vec<Token>) -> Vec<u8>{
                 index += expanded_v.len();
                 pure_script.extend(expanded_v);
             },
-            Token::Label(v) => {},
+            Token::Label(_) => {},
         }
     }
 
@@ -555,7 +596,7 @@ trait Oos{
 
 impl Oos for Option<i64>{
     fn oos(self:&Self, strict:&bool) -> i64{
-        match(self){
+        match self{
 
             Some(v) => *v,
             None => {
@@ -577,7 +618,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
     if code.len() == 0{return}
 
     let mut index = 0;
-    let mut ram:HashMap<i64, i64> = HashMap::new();
+    // let mut ram:HashMap<i64, i64> = HashMap::new();
 
     let mut stacks: [Vec<i64>;2] = [vec!(),vec!()];
     let mut stack: &mut Vec<i64>;
@@ -594,7 +635,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
             eprintln!("{:#018X}: {}", index, code[index] as char);
         }
 
-        match(code[index]){
+        match code[index]{
             b'$' => {//Switch stack
                 stack_index = !stack_index&1;
                 stack = &mut stacks[stack_index];
@@ -663,7 +704,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
             }
             b'0' => {
                 let a = stack.pop().oos(&strict);
-                stack.push((a << 1));
+                stack.push(a << 1);
             }
             b'@' => {
                 let a = stack.pop().oos(&strict);
@@ -690,7 +731,7 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
         }
 
         index = (Wrapping(index)+Wrapping(1usize)).0;
-        if (index<0) | (index >= code.len()) {
+        if index >= code.len() {
             if strict{
                 eprintln!("Strict mode violation: Outside of code memmory (offset: 0x{:#018X})", index);
                 exit(1);
