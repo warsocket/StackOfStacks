@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import sys
+from pathlib import Path
+
 OPCODE_SIZE = 32
 
 # Bytecode to linux x86_64 native compiler
 print(f"Compiling bytecode (stdin) to elf64 (stdout)", file=sys.stderr)
 
-with open("opcodes.template", "rb") as f:
+templates_dir = Path(__file__).resolve().parent / "templates"
+
+with open(templates_dir / "opcodes.template", "rb") as f:
 	opcodes_bytes = f.read()
 
 if len(opcodes_bytes) != OPCODE_SIZE*16:
@@ -13,10 +17,10 @@ if len(opcodes_bytes) != OPCODE_SIZE*16:
 	exit(1)
 
 
-with open("prologue.template", "rb") as f:
+with open(templates_dir / "prologue.template", "rb") as f:
 	prologue_bytes = f.read()
 
-with open("epilogue.template", "rb") as f:
+with open(templates_dir / "epilogue.template", "rb") as f:
 	epilogue_bytes = f.read()
 
 

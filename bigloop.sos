@@ -1,0 +1,38 @@
+#!./target/release/stackofstacks --strict
+
+#!!*				# 1 on stack
+#00000			# make it 32
+#=*=*			# make it 32*32 = 1Ki, 1K *1K  = 1Mi
+#00000000		# Make it 256x bigger
+#$!01101			# -19 on other stack [hardcoded jumpback]
+#
+## loops tart here
+#$
+#!+				# dec counter by 1 (+ -1)
+#==/				# test 0
+#!!*^			# flip jump logic 1=0 0=1
+#!!*1			# 3 set jump scale
+#*@				# jump
+#
+#$=@				# jump back via other stack
+#
+#!@				# exit
+
+
+#init
+
+!!*				# 1 on stack
+00000			# make it 32
+=*=*			# make it 32*32 = 1Ki, 1K *1K  = 1Mi
+00000000		# Make it 256x bigger
+$[start-end]	# wirite rel jump offset on other stack
+
+:start
+=!$				# dup offset, add -1, swithc stack
+!+==/			# dec counter by 1 (+ -1) and test for 0
+~&$				# send test result off, sqash -1 returned, swap stacks
+*@				# apply offset with test result and jmp
+
+:end
+
+!@
