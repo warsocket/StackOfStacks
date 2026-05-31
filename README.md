@@ -23,16 +23,16 @@ Program execution works as follows `Monospace is pseudocode calrification`:
 
 Instructions
 ------------
-| Instruction | Mnemonic | Stacks Before | Stacks After |
+| Instruction | Mnemonic | Stacks Before [^1] | Stacks After [^1] |
 |-|-|-|-|
 | `!` | PUSH -1 | `[1,2]` `[3,4]` | `[1,2,-1]` `[3,4]` |
 | `^` | XOR | `[1,2]` `[3,4]` | `[3]` `[3,4]` |
 | `\|` | OR | `[1,2]` `[3,4]` | `[3]` `[3,4]` |
 | `&` | AND | `[1,2]` `[3,4]` | `[0]` `[3,4]` |
 | `+` | ADD | `[1,2]` `[3,4]` | `[3]` `[3,4]` |
-| `-` | SUB | `[-1]` `[3,4]` | `[1,2]` `[3,4]` |
-| `*` | MUL | `[2]` `[3,4]` | `[1,2]` `[3,4]` |
-| `/` | DIV | `[0]` `[3,4]` | `[1,2]` `[3,4]` |
+| `-` | SUB | `[1,2]` `[3,4]` | `[-1]` `[3,4]` |
+| `*` | MUL | `[1,2]` `[3,4]` | `[2]` `[3,4]` |
+| `/` | DIV | `[1,2]` `[3,4]` | `[0]` `[3,4]` |
 | `$` | SWAPSTACK | `[1,2]` `[3,4]` | `[3,4]` `[1,2]` |
 | `~` | XCHANGE | `[1,2]` `[3,4]` | `[1,4]` `[3,2]` |
 | `=` | DUP | `[1,2]` `[3,4]` | `[1,2,2]` `[3,4]` |
@@ -41,6 +41,8 @@ Instructions
 | `.` | WRITE | `[1,2]` `[3,4]` | `[1]` `[3,4]` |
 | `0` | SHL0 | `[1,2]` `[3,4]` | `[1,4]` `[3,4]` |
 | `1` | SHL1 | `[1,2]` `[3,4]` | `[1,5]` `[3,4]` |
+
+[^1]: Please note that the top of a stack is on the right side of the list syntax and the left lift is the active stack in this table
 
 
 Running
@@ -52,4 +54,4 @@ You can run the sos with:
 `./helloworld.sos`
 
 Now if you want an native ELF64 executable:
-`./helloworld.sos --compile | ./compile.py > helloworld`
+`./helloworld.sos --elf64 > helloworld`

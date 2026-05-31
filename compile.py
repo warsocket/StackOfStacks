@@ -6,6 +6,7 @@ OPCODE_SIZE = 32
 
 # Bytecode to linux x86_64 native compiler
 print(f"Compiling bytecode (stdin) to elf64 (stdout)", file=sys.stderr)
+print(f"DEPRECATED: please use the mian tool with --elf64 to compile native binaries", file=sys.stderr)
 
 templates_dir = Path(__file__).resolve().parent / "templates"
 

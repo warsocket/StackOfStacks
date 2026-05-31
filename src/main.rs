@@ -7,6 +7,8 @@ use std::io::{Read, Write, stdin, stdout/*, stderr*/};
 use std::collections::HashMap;
 
 
+const OPCODE_SIZE:usize = 32;
+
 const TOKENS:[u8;16] = [ //encoding 1 nibble pertoken, 2 per byte
     b'!', // HIGH ALL write new value to stack with all bits set to 1 (-1)
     b'^', // XOR
@@ -47,6 +49,7 @@ fn main() -> Result<(),std::io::Error> {
         COMPILE,
         BYTECODE,
         DUMP,
+        ELF64,
     }
 
 
@@ -62,6 +65,7 @@ fn main() -> Result<(),std::io::Error> {
                     eprintln!("  --strict    Aborts when popping from empty stack or accessing uninitialised ram");
                     eprintln!("  --compile   Compiles program to bytecode (emitted on STDOUT)");
                     eprintln!("  --bytecode  Runs compiled bytecode instead of text");
+                    eprintln!("  --elf64     Compiles to an native linux 64 bit elf executable");
                 },                
                 "--debug" => {
                     debug = true;
@@ -77,6 +81,9 @@ fn main() -> Result<(),std::io::Error> {
                 },
                 "--bytecode" => {
                     mode = Mode::BYTECODE;
+                },
+                "--elf64" => {
+                    mode = Mode::ELF64;
                 },
                 _ => {
                     eprintln!("Unknown option '{}' !", param);
@@ -145,8 +152,11 @@ fn main() -> Result<(),std::io::Error> {
                 eprintln!("0x{:#018X}:  {}", index, token);
                 index += 1;
             }
+        },
+        Mode::ELF64 => { 
+            emit_elf64(&compile(&parse(&tokenise(script_bytes))))?; 
+        },
 
-        },        
     }
 
     Ok(())
@@ -748,4 +758,56 @@ fn run(code:&Vec<u8>, debug:bool, strict:bool){
     }
     
 
+}
+
+fn emit_elf64(bytecode: &Vec<u8>) -> Result<(),std::io::Error>{
+
+    fn get_embedded_templates() -> (&'static [u8], &'static [u8], &'static [u8]) {
+        const OPCODE_SIZE: usize = 32;
+        
+        // De bestanden worden tijdens 'cargo build' ingeladen in de binary
+        let opcodes_bytes = include_bytes!("../templates/opcodes.template");
+        let prologue_bytes = include_bytes!("../templates/prologue.template");
+        let epilogue_bytes = include_bytes!("../templates/epilogue.template");
+
+        // Validatie (wordt geëvalueerd tijdens runtime, maar is nu een simpele assert)
+        assert!(
+            opcodes_bytes.len() == OPCODE_SIZE * 16,
+            "Resource error: opcodes.template file corrupt. (size: {} != {})",
+            opcodes_bytes.len(),
+            OPCODE_SIZE * 16
+        );
+
+        (prologue_bytes, opcodes_bytes, epilogue_bytes)
+    }
+
+
+    let mut asm_index:Vec<u8> = vec!();
+
+    //convert to indices in template
+    for byte in bytecode{
+        asm_index.push((byte >> 4) & 0xF);
+        asm_index.push(byte & 0xF);
+    }
+
+    let (prologue_bytes, opcodes_bytes, epilogue_bytes) = get_embedded_templates();
+
+    let mut padding:Vec<u8> = vec!();
+
+    while ( (prologue_bytes.len() + padding.len() )  % OPCODE_SIZE) != 0{
+        padding.push(0x90);
+    }
+
+
+    std::io::stdout().write_all(prologue_bytes)?;
+    std::io::stdout().write_all(&padding)?;
+    
+    for opcode in &asm_index{
+        let start = OPCODE_SIZE*(*opcode) as usize;
+        let end = OPCODE_SIZE*(*opcode+1) as usize;
+        std::io::stdout().write_all(&opcodes_bytes[start..end])?;
+    }
+
+    std::io::stdout().write_all(epilogue_bytes)?;
+    Ok(())
 }
