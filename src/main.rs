@@ -50,6 +50,7 @@ fn main() -> Result<(),std::io::Error> {
         BYTECODE,
         DUMP,
         ELF64,
+        // PE64,
     }
 
 
@@ -85,6 +86,10 @@ fn main() -> Result<(),std::io::Error> {
                 "--elf64" => {
                     mode = Mode::ELF64;
                 },
+                // Lets diable this untill it works
+                // "--pe64" => {
+                //     mode = Mode::PE64;
+                // },                
                 _ => {
                     eprintln!("Unknown option '{}' !", param);
                     exit(1);
@@ -156,7 +161,9 @@ fn main() -> Result<(),std::io::Error> {
         Mode::ELF64 => { 
             emit_elf64(&compile(&parse(&tokenise(script_bytes))))?; 
         },
-
+        // Mode::PE64 => { 
+        //     emit_pe64(&compile(&parse(&tokenise(script_bytes))))?; 
+        // },
     }
 
     Ok(())
@@ -767,8 +774,8 @@ fn emit_elf64(bytecode: &Vec<u8>) -> Result<(),std::io::Error>{
         
         // De bestanden worden tijdens 'cargo build' ingeladen in de binary
         let opcodes_bytes = include_bytes!("../templates/opcodes.template");
-        let prologue_bytes = include_bytes!("../templates/prologue.template");
-        let epilogue_bytes = include_bytes!("../templates/epilogue.template");
+        let prologue_bytes = include_bytes!("../templates/prologue_elf64.template");
+        let epilogue_bytes = include_bytes!("../templates/epilogue_elf64.template");
 
         // Validatie (wordt geëvalueerd tijdens runtime, maar is nu een simpele assert)
         assert!(
@@ -811,3 +818,81 @@ fn emit_elf64(bytecode: &Vec<u8>) -> Result<(),std::io::Error>{
     std::io::stdout().write_all(epilogue_bytes)?;
     Ok(())
 }
+
+
+
+//lets disabl ethios so we dont include junk data not used yet
+
+// fn emit_pe64(bytecode: &Vec<u8>) -> Result<(), std::io::Error> {
+//     const OPCODE_SIZE: usize = 32;
+//     const FILE_ALIGNMENT: usize = 512;
+
+//     fn get_embedded_templates() -> (&'static [u8], &'static [u8], &'static [u8]) {
+//         let opcodes_bytes = include_bytes!("../templates/opcodes.template");
+//         let prologue_bytes = include_bytes!("../templates/prologue_pe64.template");
+//         let epilogue_bytes = include_bytes!("../templates/epilogue_pe64.template");
+
+//         assert!(
+//             opcodes_bytes.len() == OPCODE_SIZE * 16,
+//             "Resource error: opcodes.template file corrupt."
+//         );
+
+//         (prologue_bytes, opcodes_bytes, epilogue_bytes)
+//     }
+
+//     let mut asm_index: Vec<u8> = vec![];
+//     for byte in bytecode {
+//         asm_index.push((byte >> 4) & 0xF);
+//         asm_index.push(byte & 0xF);
+//     }
+
+//     let (prologue_bytes, opcodes_bytes, epilogue_bytes) = get_embedded_templates();
+
+//     // 1. Bouw de complete binary eerst op in het geheugen (een buffer)
+//     let mut binary_buffer: Vec<u8> = prologue_bytes.to_vec();
+
+//     // Padding tussen proloog en eerste opcode voor de 32-byte uitlijning
+//     while (binary_buffer.len() % OPCODE_SIZE) != 0 {
+//         binary_buffer.push(0x90);
+//     }
+
+//     // Voeg alle opcodes toe
+//     for opcode in &asm_index {
+//         let start = OPCODE_SIZE * (*opcode) as usize;
+//         let end = OPCODE_SIZE * (*opcode + 1) as usize;
+//         binary_buffer.extend_from_slice(&opcodes_bytes[start..end]);
+//     }
+
+//     // Voeg de epiloog toe
+//     binary_buffer.extend_from_slice(epilogue_bytes);
+
+//     // 2. Windows Specifieke Padding: Het hele bestand MOET een veelvoud van 512 bytes zijn
+//     while (binary_buffer.len() % FILE_ALIGNMENT) != 0 {
+//         binary_buffer.push(0x00); // Nullen aan het einde van het bestand is prima
+//     }
+
+//     let total_file_size = binary_buffer.len() as u32;
+
+//     // 3. Patch de PE-Header met de exacte nieuwe groottes!
+//     // We overschrijven de hardcoded waarden in de template met de echte runtime waarden.
+    
+//     // Size of Code (Offset 0x74 in een standaard PE32+ header vanaf het begin van het bestand)
+//     let size_of_code = total_file_size - 512;
+//     binary_buffer[0x74..0x78].copy_from_slice(&size_of_code.to_le_bytes());
+
+//     // Size of Image (Offset 0x90: Hoeveel virtueel geheugen er nodig is, we ronden af op 4096 alignment)
+//     let size_of_image = ((total_file_size + 4095) / 4096) * 4096;
+//     binary_buffer[0x90..0x94].copy_from_slice(&size_of_image.to_le_bytes());
+
+//     // Size of Raw Data in de .text Section Header (Offset 0x110)
+//     let size_of_raw_data = total_file_size - 512;
+//     binary_buffer[0x110..0x114].copy_from_slice(&size_of_raw_data.to_le_bytes());
+
+//     // Virtual Size in de .text Section Header (Offset 0x10C)
+//     binary_buffer[0x10C..0x110].copy_from_slice(&size_of_raw_data.to_le_bytes());
+
+
+//     // 4. Schrijf de volledig gepatchte en uitgelijnde binary naar stdout
+//     std::io::stdout().write_all(&binary_buffer)?;
+//     Ok(())
+// }

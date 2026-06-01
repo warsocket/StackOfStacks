@@ -1,6 +1,6 @@
 .PHONY: all clean
 
-all: prologue.template opcodes.template epilogue.template
+all: opcodes.template prologue_elf64.template epilogue_elf64.template prologue_pe64.template epilogue_pe64.template
 clean:
 	rm -f *.template
 
