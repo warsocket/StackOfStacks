@@ -183,15 +183,19 @@ entry_point:
     ; HANDLE GetStdHandle(DWORD nStdHandle);
     ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
 
-    xchg rbp, rdi               ; Again whiny windows defender
-    sub rsp, 32
 
-    mov rcx, -11                ; STD_OUTPUT_HANDLE = -11
-    call [rbp - 16]             ; Call GetStdHandle
-    mov rbx, rax                ; RBX = stdout handle
+    push qword 'X'
+    call write
 
-    add rsp, 32
-    xchg rbp, rdi               ; Again whiny windows defender
+    ; xchg rbp, rdi               ; Again whiny windows defender
+    ; sub rsp, 32
+
+    ; mov rcx, -11                ; STD_OUTPUT_HANDLE = -11
+    ; call [rbp - 16]             ; Call GetStdHandle
+    ; mov rbx, rax                ; RBX = stdout handle
+
+    ; add rsp, 32
+    ; xchg rbp, rdi               ; Again whiny windows defender
 
     ; ; 2. Put 'A' on local stack frame
     ; mov byte [rbp - 48], 0x41   ; ASCII 'A' at a safe offset
@@ -262,11 +266,23 @@ entry_point:
 ; ==============================================================================
 ; helpers for the 3 in languiage insrucitons  ?. and !@ (exit)
 ; ==============================================================================
+
+; TODO these calls need an automagic alignment fix OR
+; a stack frame shift
+
 write:
 
     ; The stack now contains:
     ; Return address [rsp+0]
     ; The character (in the low byte of the qword) [rsp+8]
+
+    ; calculate stack misalign (8 /16 byte misalign only)
+    mov rsi, rsp
+    and rsi, 0x08
+
+    ; fix misalign
+    sub rsp, rsi
+
 
     ; --------------------------------------------------------------------------
     ; Write Character 'A' to stdout
@@ -275,17 +291,47 @@ write:
     ; HANDLE GetStdHandle(DWORD nStdHandle);
     ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
 
+
+
     xchg rbp, rdi               ; Again whiny windows defender
+
+    ; push parmeter 5 of second call first fist
+    push 0 ; stack padding
+    push 0 ; 5th arg: lpOverlapped
+
     sub rsp, 32
 
 
+    ; Get stdout handle
+    ; HANDLE GetStdHandle(DWORD nStdHandle);
+    ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
     mov rcx, -11                ; STD_OUTPUT_HANDLE = -11
     call [rbp - 16]             ; Call GetStdHandle
     mov rbx, rax                ; RBX = stdout handle
 
+    ; Call WriteFile
+    ; BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
+    ; Arguments: RCX = hFile, RDX = lpBuffer, R8 = nBytesToWrite, R9 = lpBytesWritten, [RSP+32] = lpOverlapped
+    mov rcx, rbx                ; 1st arg: stdout handle
+    ; lea rdx, [rbp - 48]       ; 2nd arg: pointer to character 'A'
+    lea rdx, [rsp+rsi+32+0x08+0x10]
+    mov r8, 1                   ; 3rd arg: 1 byte
+    lea r9, [rbp - 64]          ; 4th arg: pointer to receive bytes written
+    ; mov qword [rsp + 32], 0   ; 5th arg: lpOverlapped = NULL (on stack) 
+    call [rbp - 0x18]             ; Call WriteFile
 
     add rsp, 32
+
+    ; Clean parameter5
+    pop r9
+    pop r10
+    
+
     xchg rbp, rdi               ; Again whiny windows defender
+
+    ; unfix misalign [restore stack to original]
+    add rsp, rsi
+
 
     ; If windows does dirty so can I
     add rsp, 16

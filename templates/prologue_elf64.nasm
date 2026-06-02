@@ -90,3 +90,5 @@ syscall
 
 add r14, (.syscall_start - .get_rip)
 code_section_end:
+
+align OPCODE_SIZE, db 0x90	;shoudl make the padding fiuller in rust  obsolete, BUT NEEDS TEST!
