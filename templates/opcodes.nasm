@@ -101,7 +101,8 @@ call .next ; stack = rip
 pop rbx
 
 shl rax, OPCODE_BITS
-and rbx, r13 ; r13 = -OPCODE_SIZE bitmask to floor our offset
+; and rbx, r13 ; r13 = -OPCODE_SIZE bitmask to floor our offset
+and rbx, -OPCODE_SIZE
 
 add rbx, rax
 jmp rbx
@@ -113,29 +114,34 @@ OPCODE_END
 
 ; ? READ
 OPCODE_START
-push 0
-xor rax, rax
-xor rdi, rdi
-mov rsi, rsp
-mov rdx, 1
-syscall
+call r12
 
-mov rcx, rax ; copy reutrn
-pop rax ; char in rax
-test rcx, rcx ; return == 0
-cmovz rax, r12 ; -1 in rax if eof
-push rax ; char / -1 to stack
+; push 0
+; xor rax, rax
+; xor rdi, rdi
+; mov rsi, rsp
+; mov rdx, 1
+; syscall
+
+; mov rcx, rax ; copy reutrn
+; pop rax ; char in rax
+; test rcx, rcx ; return == 0
+; cmovz rax, r12 ; -1 in rax if eof
+; push rax ; char / -1 to stack
 
 OPCODE_END
 
 ; . WRITE
 OPCODE_START
-mov rax, 1
-mov rsi, rsp
-mov rdi, rax
-mov rdx, rax
-lea rsp, [rsp+8]
-syscall
+call r13
+
+; mov rax, 1
+; mov rsi, rsp
+; mov rdi, rax
+; mov rdx, rax
+; lea rsp, [rsp+8]
+; syscall
+
 OPCODE_END
 
 ; 0 SHL0

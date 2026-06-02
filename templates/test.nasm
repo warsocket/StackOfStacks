@@ -245,22 +245,22 @@ entry_point:
     ; HANDLE GetStdHandle(DWORD nStdHandle);
     ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
 
-    mov rcx, -11                ; STD_OUTPUT_HANDLE = -11
-    call [rbp - 16]             ; Call GetStdHandle
-    mov rbx, rax                ; RBX = stdout handle
+    ; mov rcx, -11                ; STD_OUTPUT_HANDLE = -11
+    ; call [rbp - 16]             ; Call GetStdHandle
+    ; mov rbx, rax                ; RBX = stdout handle
 
-    ; 2. Put 'A' on local stack frame
-    mov byte [rbp - 48], 0x41   ; ASCII 'A' at a safe offset
+    ; ; 2. Put 'A' on local stack frame
+    ; mov byte [rbp - 48], 0x41   ; ASCII 'A' at a safe offset
 
-    ; Call WriteFile
-    ; BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
-    ; Arguments: RCX = hFile, RDX = lpBuffer, R8 = nBytesToWrite, R9 = lpBytesWritten, [RSP+32] = lpOverlapped
-    mov rcx, rbx                ; 1st arg: stdout handle
-    lea rdx, [rbp - 48]         ; 2nd arg: pointer to character 'A'
-    mov r8, 1                   ; 3rd arg: 1 byte
-    lea r9, [rbp - 64]          ; 4th arg: pointer to receive bytes written
-    mov qword [rsp + 32], 0     ; 5th arg: lpOverlapped = NULL (on stack)
-    call [rbp - 0x18]             ; Call WriteFile
+    ; ; Call WriteFile
+    ; ; BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
+    ; ; Arguments: RCX = hFile, RDX = lpBuffer, R8 = nBytesToWrite, R9 = lpBytesWritten, [RSP+32] = lpOverlapped
+    ; mov rcx, rbx                ; 1st arg: stdout handle
+    ; lea rdx, [rbp - 48]         ; 2nd arg: pointer to character 'A'
+    ; mov r8, 1                   ; 3rd arg: 1 byte
+    ; lea r9, [rbp - 64]          ; 4th arg: pointer to receive bytes written
+    ; mov qword [rsp + 32], 0     ; 5th arg: lpOverlapped = NULL (on stack)
+    ; call [rbp - 0x18]             ; Call WriteFile
 
 
 
@@ -277,6 +277,13 @@ entry_point:
 ; ==============================================================================
 ; helpers for the 3 in languiage insrucitons  ?. and !@ (exit)
 ; ==============================================================================
+
+call .get_rip
+.get_rip:
+pop r15
+jmp short .functions_end
+
+
 read:
     ; The stack now contains:
     ; Return address [rsp+0]
@@ -410,6 +417,15 @@ exit:
     xchg rbp, rdi               ; Again whiny windows defender
     call [rdi - 0x28]           ; Call ExitProcess (Flushes buffers, never returns)
     xchg rdi, rbp               ; Not needed behing ExitPocess, But Im just being pendantic wback against WINDHOOS
+
+
+.functions_end:
+mov r12, r15
+mov r13, r15
+mov r14, r15
+add r12, (.read - .get_rip)
+add r13, (.write - .get_rip)
+add r14, (.exit - .get_rip)
 
 ; ==============================================================================
 ; HELPER: GetProcAddress parser (Scans export table manually)

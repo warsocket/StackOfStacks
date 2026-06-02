@@ -77,18 +77,60 @@ mov r13, -OPCODE_SIZE ;mask
 
 call .get_rip
 .get_rip:
-pop r14
-jmp short .syscall_end
+pop r15
+jmp short .functions_end
 
-.syscall_start:
+.read:
+push 0
+xor rax, rax
+xor rdi, rdi
+mov rsi, rsp
+mov rdx, 1
+syscall
+
+mov rdx, -1
+mov rcx, rax ; copy reutrn
+pop rax ; char in rax
+test rcx, rcx ; return == 0
+cmovz rax, rdx ; -1 in rax if eof
+
+pop r11 ;ret addr in r11
+push rax ; char / -1 to stack
+jmp r11
+
+
+.write:
+;fix annoydiing stack frame flipping ret addr and  parameter
+pop r9	; ret
+pop r8  ; the value
+push r9
+push r8
+
+mov rax, 1
+mov rsi, rsp
+mov rdi, rax
+mov rdx, rax
+lea rsp, [rsp+8]
+syscall
+ret
+
+
+.exit:
 ;Exit syscall code here
 push 60
 pop rax
 xor edi, edi
 syscall
-.syscall_end:
 
-add r14, (.syscall_start - .get_rip)
+.functions_end:
+mov r12, r15
+mov r13, r15
+mov r14, r15
+add r12, (.read - .get_rip)
+add r13, (.write - .get_rip)
+add r14, (.exit - .get_rip)
+
+
 code_section_end:
 
 align OPCODE_SIZE, db 0x90	;shoudl make the padding fiuller in rust  obsolete, BUT NEEDS TEST!
