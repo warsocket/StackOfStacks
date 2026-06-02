@@ -81,6 +81,12 @@ entry_point:
     ; --------------------------------------------------------------------------
     ; STEP 1: Locate Kernel32.dll Base Address via PEB
     ; --------------------------------------------------------------------------
+
+    ; Apparently this dint help with heristic scanners going beserk    
+    ; jmp short spoof
+    ; db 0x6a ;push byte
+    ; spoof:
+
     mov rax, [gs:0x60]          ; RAX = PEB address
     mov rax, [rax + 0x18]       ; RAX = PEB->Ldr
     mov rax, [rax + 0x20]       ; RAX = PEB->Ldr->InMemoryOrderModuleList (target.exe)
@@ -118,6 +124,11 @@ entry_point:
     call get_proc_address
     mov [rbp - 0x30], rax         ; Store VirtualAlloc pointer at [rbp - 48]
 
+    ; lea rsi, [rel str_virutalalloc]
+    ; call get_proc_address
+    ; mov [rbp - 0x30], rax         ; Store ExitProcess pointer at [rbp - 40]
+
+
 
 
 
@@ -127,7 +138,7 @@ entry_point:
     ; LPVOID VirtualAlloc(LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
 
     xor rcx, rcx                ; 1st arg: lpAddress = NULL (Windows decides base address)
-    mov rdx, STORAGE            ; 2nd arg: dwSize = 512 MB (512 * 1024 * 1024)
+    mov rdx, 0x100              ; 2nd arg: dwSize = 512 MB (512 * 1024 * 1024)
     mov r8, 0x3000              ; 3rd arg: flAllocationType = MEM_COMMIT | MEM_RESERVE (0x1000 | 0x2000)
     mov r9, 0x04                ; 4th arg: flProtect = PAGE_READWRITE (0x04)
     call [rbp - 0x30]           ; Call VirtualAlloc rax = beginning of memory
@@ -184,7 +195,7 @@ entry_point:
     ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
 
 
-    push qword 'X'
+    call read
     call write
 
     ; xchg rbp, rdi               ; Again whiny windows defender
@@ -266,12 +277,66 @@ entry_point:
 ; ==============================================================================
 ; helpers for the 3 in languiage insrucitons  ?. and !@ (exit)
 ; ==============================================================================
+read:
+    ; The stack now contains:
+    ; Return address [rsp+0]
 
-; TODO these calls need an automagic alignment fix OR
-; a stack frame shift
+    ; make way for our answer
+    pop r9
+    push 0
+    push r9
+
+    ; calculate stack misalign (8 /16 byte misalign only)
+    mov rsi, rsp
+    and rsi, 0x08
+
+    ; fix misalign
+    sub rsp, rsi
+
+
+    xchg rbp, rdi               ; Again whiny windows defender
+
+    ; push parmeter 5 of second call first fist
+    push 0 ; stack padding
+    push 0 ; 5th arg: lpOverlapped
+
+    sub rsp, 32
+
+
+    ; Get stdin handle
+    ; HANDLE GetStdHandle(DWORD nStdHandle);
+    ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
+    mov rcx, -10                ; STD_INPUT_HANDLE = -10
+    call [rbp - 16]             ; Call GetStdHandle
+    mov rbx, rax                ; RBX = stdin handle
+
+    ; Call ReadFile
+    ; BOOL ReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped);
+    ; Arguments: RCX = hFile, RDX = lpBuffer, R8 = nBytesToRead, R9 = lpBytesRead, [RSP+32] = lpOverlapped
+    mov rcx, rbx                ; 1st arg: stdin handle
+    ; lea rdx, [rbp - 48]       ; 2nd arg: pointer to character 'A'
+    lea rdx, [rsp+rsi+32+0x08+0x10]
+    mov r8, 1                   ; 3rd arg: 1 byte
+    lea r9, [rbp - 64]          ; 4th arg: pointer to receive bytes read
+    ; mov qword [rsp + 32], 0   ; 5th arg: lpOverlapped = NULL (on stack) 
+    call [rbp - 0x20]           ; Call ReadFile
+
+   
+    add rsp, 32
+    ; Clean parameter5
+    pop r9
+    pop r10
+    
+
+    xchg rbp, rdi               ; Again whiny windows defender
+
+    ; unfix misalign [restore stack to original]
+    add rsp, rsi
+
+    ret
+
 
 write:
-
     ; The stack now contains:
     ; Return address [rsp+0]
     ; The character (in the low byte of the qword) [rsp+8]
@@ -282,15 +347,6 @@ write:
 
     ; fix misalign
     sub rsp, rsi
-
-
-    ; --------------------------------------------------------------------------
-    ; Write Character 'A' to stdout
-    ; --------------------------------------------------------------------------
-    ; Get stdout handle
-    ; HANDLE GetStdHandle(DWORD nStdHandle);
-    ; Arguments: RCX = nStdHandle (-10 = Input, -11 = Output, -12 = Error)
-
 
 
     xchg rbp, rdi               ; Again whiny windows defender
@@ -427,6 +483,7 @@ str_getstdhandle: db 'GetStdHandle', 0
 str_writefile:    db 'WriteFile', 0
 str_readfile:    db 'ReadFile', 0
 str_exitprocess:  db 'ExitProcess', 0
+str_virutalalloc:  db 'VirtualAlloc', 0
 
 ; Force the complete flat binary file to end exactly at the 512-byte boundary
 ; we will ahve to do this later by had in rust
