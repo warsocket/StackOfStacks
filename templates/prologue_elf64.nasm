@@ -6,7 +6,6 @@
 [bits 64]
 
 %define OPCODE_SIZE 32
-%define OPCODE_BITS 5; 32 is 5 bits aka  1 1111
 
 
 ; Virtual address of where the ELF file will be mapped
@@ -133,4 +132,4 @@ add r14, (.exit - .get_rip)
 
 code_section_end:
 
-align OPCODE_SIZE, db 0x90	;shoudl make the padding fiuller in rust  obsolete, BUT NEEDS TEST!
+align OPCODE_SIZE, db 0x90
